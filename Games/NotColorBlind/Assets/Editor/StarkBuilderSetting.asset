@@ -49,15 +49,15 @@ MonoBehaviour:
   NativeWhiteListRegex:
   - com.bytedance.starksdk
   - _Backup~
-  _appId: tt7d820b3fe3e2a5f507
+  _appId: tt8836fe8b1656a2b807
   version: 
   autoVersion: 0
-  _webglPackagePath: 
+  _webglPackagePath: G:\DYGame\Games\NotColorBlind\tt-minigame\tt-minigame
   _orientation: 0
   _iOSPerformancePlus: 0
   _menuButtonStyle: 0
   _publishType: 0
   publishDesc: 
-  idePath: 
+  idePath: "F:/Users/liuhaibin/AppData/Local/Programs/@bytedminiprogram-ide/\u6296\u97F3\u5F00\u53D1\u8005\u5DE5\u5177.exe"
   isConvert: 0
   isOldBuildFormat: 0
