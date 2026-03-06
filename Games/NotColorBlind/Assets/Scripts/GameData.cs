@@ -8,6 +8,8 @@ public static class GameData
 {
     public static string PlayerName { get; set; } = "Player";
     public static int CurrentLevel { get; set; } = 1;
+    public static int BusyCoinCount { get; set; } = 10; // 忙币数量，默认10个
+    public static int ConsecutiveCorrect { get; set; } = 0; // 连续答对次数
 
     /// <summary>
     /// Total number of levels in the game.
@@ -34,6 +36,7 @@ public static class GameData
         // set dummy values
         PlayerName = "TestUser";
         CurrentLevel = 1;
+        BusyCoinCount = 10; // 从服务器加载忙币数量
         onComplete?.Invoke();
         Object.Destroy(GameObject.Find("ServerRunner"));
     }
