@@ -1,6 +1,7 @@
 using UnityEngine;
 using UnityEngine.UI;
 using UnityEngine.SceneManagement;
+using System.Collections;
 
 /// <summary>
 /// Responsible for generating the grid of colored squares and
@@ -10,6 +11,8 @@ public class LevelController : MonoBehaviour
 {
     [Header("UI References")]
     public Text levelLabel;            // "第 x 关"
+    public Text countdownText;         // countdown display
+    public Image sandClockIcon;        // sand clock icon
     public RectTransform gridParent;   // container for blocks
     public GameObject blockPrefab;     // simple UI Image prefab
     [Header("Board Background")]
@@ -23,6 +26,8 @@ public class LevelController : MonoBehaviour
     private Color commonColor;
     private Color oddColor;
     private Vector2Int oddPosition;
+    private float countdownDuration = 5f; // temporary fixed 5s
+    private bool hasSelected = false;
 
     private void Start()
     {
@@ -35,6 +40,8 @@ public class LevelController : MonoBehaviour
         ComputeGridSize(level);
         GenerateColors(level);
         BuildGrid();
+        hasSelected = false;
+        StartCoroutine(StartCountdown());
     }
 
     private void ComputeGridSize(int level)
@@ -165,8 +172,30 @@ public class LevelController : MonoBehaviour
         }
     }
 
+    private IEnumerator StartCountdown()
+    {
+        float timeLeft = countdownDuration;
+        while (timeLeft > 0)
+        {
+            countdownText.text = $"倒计时:{Mathf.Ceil(timeLeft)}";
+            if (sandClockIcon != null)
+            {
+                sandClockIcon.transform.Rotate(0, 0, 180);
+            }
+            yield return new WaitForSeconds(1f);
+            timeLeft -= 1f;
+        }
+        countdownText.text = "倒计时:0";
+        if (!hasSelected)
+        {
+            ShowResult(false);
+        }
+    }
+
     private void OnBlockClicked(int r, int c)
     {
+        if (hasSelected) return; // prevent multiple clicks
+        hasSelected = true;
         bool correct = (r == oddPosition.x && c == oddPosition.y);
         ShowResult(correct);
     }
