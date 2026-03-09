@@ -20,7 +20,7 @@ public class LevelController : MonoBehaviour
     [Header("Effects")]
     public GameObject successEffectPrefab; // 成功特效预制件
     public Text comboText;             // 连击次数显示文本（作为 Prefab 引用）
-    public float effectDuration = 1f; // 特效持续时间
+    public float effectDuration = 0.5f; // 特效持续时间
     [Header("Effect Settings")]
     public float effectScale = 10f;    // 特效缩放倍数（UI Canvas 适配）
     public int effectRenderTextureSize = 1024; // 特效渲染到UI的RT尺寸
@@ -36,7 +36,7 @@ public class LevelController : MonoBehaviour
     private Color commonColor;
     private Color oddColor;
     private Vector2Int oddPosition;
-    private float countdownDuration = 50f; // temporary fixed 5s
+    private float countdownDuration = 10f; // temporary fixed 10s
     private bool hasSelected = false;
     
     // 忙币相关

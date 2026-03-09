@@ -322,7 +322,7 @@ RectTransform:
   m_AnchorMin: {x: 1, y: 1}
   m_AnchorMax: {x: 1, y: 1}
   m_AnchoredPosition: {x: -228, y: -249.85}
-  m_SizeDelta: {x: 50, y: 75}
+  m_SizeDelta: {x: 75, y: 75}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &473754885
 MonoBehaviour:
@@ -344,7 +344,7 @@ MonoBehaviour:
   m_OnCullStateChanged:
     m_PersistentCalls:
       m_Calls: []
-  m_Sprite: {fileID: 21300000, guid: d0819ea4eb49c3e4abd2986af0b6ea93, type: 3}
+  m_Sprite: {fileID: 21300000, guid: f8dc2eb633b16774b985220e0c5a3ca7, type: 3}
   m_Type: 0
   m_PreserveAspect: 0
   m_FillCenter: 1
@@ -677,6 +677,9 @@ MonoBehaviour:
   successEffectPrefab: {fileID: 6980582568551613744, guid: bc48d416fb7e66b42a814a6d26685ceb, type: 3}
   comboText: {fileID: 8163829772276499926, guid: 64d288b5552444246aababa90aa93784, type: 3}
   effectDuration: 1
+  effectScale: 10
+  effectRenderTextureSize: 1024
+  effectOverlaySize: {x: 700, y: 700}
   boardBackground: {fileID: 0}
   boardColor: {r: 1, g: 1, b: 1, a: 1}
   boardPadding: {x: 10, y: 10}
@@ -925,7 +928,7 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0, y: 0.5}
   m_AnchorMax: {x: 0, y: 0.5}
-  m_AnchoredPosition: {x: 150, y: 0.5}
+  m_AnchoredPosition: {x: 171.32, y: 0.5}
   m_SizeDelta: {x: 200, y: 50}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!1 &2146480405
