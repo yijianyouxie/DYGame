@@ -1,0 +1,7 @@
+ManifestFileVersion: 0
+CRC: 3189005918
+AssetBundleManifest:
+  AssetBundleInfos:
+    Info_0:
+      Name: starktester.ab
+      Dependencies: {}
