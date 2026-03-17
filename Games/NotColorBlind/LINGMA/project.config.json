@@ -1,0 +1,23 @@
+{
+    "appid": "",
+    "projectname": "我不是色忙",
+    "unity": {
+        "build": {
+            "webgl": "",
+            "native": {
+                "il2cpp": "",
+                "apk": "",
+                "fullApk": ""
+            },
+            "instantGame": ""
+        },
+        "publishType": "AndroidNativeOnly",
+        "starkSdkVersion": "Without StarkSDK",
+        "unityToolsVersion": "",
+        "unityEngineVersion": "2022.3.2t13",
+        "arch": ""
+    },
+    "setting": {
+        "urlCheck": true
+    }
+}

@@ -1,0 +1,68 @@
+{
+  "name": "LeaderboardButton",
+  "components": {
+    "RectTransform": {
+      "anchoredPosition": {
+        "x": -20.0,
+        "y": -20.0
+      },
+      "sizeDelta": {
+        "x": 200.0,
+        "y": 75.0
+      },
+      "anchorMin": {
+        "x": 1.0,
+        "y": 1.0
+      },
+      "anchorMax": {
+        "x": 1.0,
+        "y": 1.0
+      },
+      "pivot": {
+        "x": 1.0,
+        "y": 1.0
+      }
+    },
+    "Image": {
+      "sprite": "Assets/Textures/bg_btn.png"
+    },
+    "Button": {
+      "transition": 1,
+      "colors": {
+        "normalColor": {
+          "r": 1.0,
+          "g": 1.0,
+          "b": 1.0,
+          "a": 1.0
+        },
+        "highlightedColor": {
+          "r": 0.9607843160629272,
+          "g": 0.9607843160629272,
+          "b": 0.9607843160629272,
+          "a": 1.0
+        },
+        "pressedColor": {
+          "r": 0.7843137383460999,
+          "g": 0.7843137383460999,
+          "b": 0.7843137383460999,
+          "a": 1.0
+        },
+        "selectedColor": {
+          "r": 0.9607843160629272,
+          "g": 0.9607843160629272,
+          "b": 0.9607843160629272,
+          "a": 1.0
+        },
+        "disabledColor": {
+          "r": 0.7843137383460999,
+          "g": 0.7843137383460999,
+          "b": 0.7843137383460999,
+          "a": 0.501960813999176
+        },
+        "colorMultiplier": 1.0,
+        "fadeDuration": 0.10000000149011612
+      }
+    }
+  },
+  "canvas_id": "39750"
+}
