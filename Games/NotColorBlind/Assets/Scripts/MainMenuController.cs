@@ -12,6 +12,10 @@ public class MainMenuController : MonoBehaviour
     public Text playerNameText;
     public Text progressText;
     public Button startButton;
+    
+    [Header("Leaderboard")]
+    public Button leaderboardButton;       // 排行榜按钮
+    public LeaderboardUI leaderboardUI;   // 排行榜 UI 引用
 
     private void Start()
     {
@@ -20,6 +24,12 @@ public class MainMenuController : MonoBehaviour
         GameData.LoadFromServer(OnDataLoaded);
 
         startButton.onClick.AddListener(OnStartClicked);
+        
+        // 绑定排行榜按钮事件
+        if (leaderboardButton != null)
+        {
+            leaderboardButton.onClick.AddListener(OnLeaderboardClicked);
+        }
     }
 
     private void OnDataLoaded()
@@ -33,5 +43,20 @@ public class MainMenuController : MonoBehaviour
     {
         // assume we have a scene for levels named "LevelScene"
         SceneManager.LoadScene("LevelScene");
+    }
+    
+    /// <summary>
+    /// 排行榜按钮点击事件
+    /// </summary>
+    private void OnLeaderboardClicked()
+    {
+        if (leaderboardUI != null)
+        {
+            leaderboardUI.ShowLeaderboard();
+        }
+        else
+        {
+            Debug.LogWarning("[MainMenuController] leaderboardUI 未赋值！");
+        }
     }
 }

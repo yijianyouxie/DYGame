@@ -17,6 +17,7 @@ public class LevelController : MonoBehaviour
     public GameObject blockPrefab;     // simple UI Image prefab
     public Button busyCoinButton;      // 忙币按钮
     public Text busyCoinCountText;     // 忙币数量显示
+    public Button returnButton;         // 返回按钮
     [Header("Effects")]
     public GameObject successEffectPrefab; // 成功特效预制件
     public Text comboText;             // 连击次数显示文本（作为 Prefab 引用）
@@ -91,6 +92,13 @@ public class LevelController : MonoBehaviour
         {
             busyCoinButton.onClick.RemoveAllListeners();
             busyCoinButton.onClick.AddListener(OnBusyCoinClicked);
+        }
+        
+        // 添加返回按钮事件监听
+        if (returnButton != null)
+        {
+            returnButton.onClick.RemoveAllListeners();
+            returnButton.onClick.AddListener(OnReturnClicked);
         }
         
         // 启动倒计时并保存协程引用
@@ -280,6 +288,10 @@ public class LevelController : MonoBehaviour
         {
             // 答对，增加连续答对次数
             GameData.ConsecutiveCorrect++;
+            
+            // 保存玩家进度到云数据库
+            LeaderboardManager.Instance.SavePlayerProgress(GameData.CurrentLevel);
+            
             ShowSuccessEffect();
         }
         else
@@ -533,5 +545,21 @@ public class LevelController : MonoBehaviour
         {
             busyCoinCountText.text = GameData.BusyCoinCount.ToString();
         }
+    }
+    
+    /// <summary>
+    /// 返回按钮点击事件
+    /// </summary>
+    private void OnReturnClicked()
+    {
+        // 停止倒计时
+        if (countdownCoroutine != null)
+        {
+            StopCoroutine(countdownCoroutine);
+            countdownCoroutine = null;
+        }
+        
+        // 返回主菜单
+        SceneManager.LoadScene("Start");
     }
 }
