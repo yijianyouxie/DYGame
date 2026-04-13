@@ -1,6 +1,7 @@
 ﻿using UnityEditor;
 using UnityEngine;
 
+#if UNITY_EDITOR
 public class TTEditorTools : EditorWindow
 {
     private string inputPath = "";
@@ -39,3 +40,4 @@ public class TTEditorTools : EditorWindow
         }
     }
 }
+#endif

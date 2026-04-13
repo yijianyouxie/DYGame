@@ -2,6 +2,7 @@ using UnityEngine;
 using UnityEditor;
 using System.IO;
 
+#if UNITY_EDITOR
 /// <summary>
 /// 创建烟花特效预设的编辑器工具
 /// </summary>
@@ -172,3 +173,4 @@ public class FireworksEffectCreator
         Debug.Log("===========================================");
     }
 }
+#endif

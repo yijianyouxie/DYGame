@@ -1,0 +1,17 @@
+{
+    "name": "GameAssembly",
+    "references": [
+        "TTLitJson",
+        "TTWebGL",
+        "com.bytedance.ttsdk.ref"
+    ],
+    "includePlatforms": [],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": false
+}

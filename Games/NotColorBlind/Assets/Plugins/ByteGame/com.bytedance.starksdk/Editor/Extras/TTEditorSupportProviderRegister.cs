@@ -1,5 +1,6 @@
 using UnityEditor;
 
+#if UNITY_EDITOR
 namespace TTSDK.Tool
 {
     [InitializeOnLoad]
@@ -16,3 +17,4 @@ namespace TTSDK.Tool
         
     }
 }
+#endif

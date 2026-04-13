@@ -1,6 +1,7 @@
 ﻿using System;
 using UnityEditor;
 
+#if UNITY_EDITOR
 namespace TTSDK
 {
     /// <summary>
@@ -27,3 +28,4 @@ namespace TTSDK
         }
     }
 }
+#endif

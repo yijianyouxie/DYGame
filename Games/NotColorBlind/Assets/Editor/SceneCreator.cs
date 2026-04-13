@@ -1,8 +1,10 @@
 using UnityEngine;
 using UnityEngine.SceneManagement;
+using System.IO;
+
+#if UNITY_EDITOR
 using UnityEditor;
 using UnityEditor.SceneManagement;
-using System.IO;
 
 /// <summary>
 /// 自动创建测试场景的编辑器脚本
@@ -105,3 +107,6 @@ public class SceneCreator : EditorWindow
         return true;
     }
 }
+#endif
+
+

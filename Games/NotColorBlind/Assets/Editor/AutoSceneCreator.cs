@@ -2,6 +2,7 @@ using UnityEngine;
 using UnityEditor;
 using System.IO;
 
+#if UNITY_EDITOR
 /// <summary>
 /// 命令行工具 - 用于从命令行创建测试场景
 /// 使用方法：Unity -batchmode -quit -projectPath [项目路径] -executeMethod AutoSceneCreator.CreateTestSceneFromCommand
@@ -25,3 +26,4 @@ public static class AutoSceneCreator
         Debug.Log("===========================================");
     }
 }
+#endif

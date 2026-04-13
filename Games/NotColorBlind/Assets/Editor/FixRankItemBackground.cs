@@ -1,6 +1,7 @@
 using UnityEngine;
 using UnityEngine.UI;
 
+#if UNITY_EDITOR
 namespace NotColorBlind.Editor
 {
     public class FixRankItemBackground : MonoBehaviour
@@ -34,3 +35,5 @@ namespace NotColorBlind.Editor
         }
     }
 }
+#endif
+

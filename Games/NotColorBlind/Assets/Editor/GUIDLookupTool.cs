@@ -1,9 +1,11 @@
 using UnityEngine;
-using UnityEditor;
-using UnityEditor.Callbacks;
 using System;
 using System.IO;
 using System.Text.RegularExpressions;
+
+#if UNITY_EDITOR
+using UnityEditor;
+using UnityEditor.Callbacks;
 
 public class PostBuildProcessor
 {
@@ -290,3 +292,5 @@ public class GUIDContextMenu
         return Convert.ToBase64String(bytes);
     }
 }
+#endif
+

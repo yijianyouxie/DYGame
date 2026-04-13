@@ -5,6 +5,7 @@ using System.Text.RegularExpressions;
 using UnityEditor;
 using UnityEngine;
 
+#if UNITY_EDITOR
 public class TTAPIUpdate
 {
     private static string noteString = "";
@@ -215,6 +216,7 @@ public class TTAPIUpdate
         
         
     }
-    
+
 
 }
+#endif
