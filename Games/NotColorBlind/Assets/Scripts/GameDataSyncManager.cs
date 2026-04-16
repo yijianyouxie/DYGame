@@ -70,6 +70,9 @@ public class GameDataSyncManager : MonoBehaviour
         {
             GameData.PlayerName = playerData.username;
         }
+
+        // 立即保存当前数据，确保云端有记录
+        SaveNow();
     }
 
     /// <summary>

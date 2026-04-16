@@ -2,6 +2,8 @@ using UnityEngine;
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Linq.Expressions;
+using System.Reflection;
 using System.Threading.Tasks;
 using TTSDK;
 using JsonData = TTSDK.UNBridgeLib.LitJson.JsonData;
@@ -30,11 +32,14 @@ public class DouyinCloudManager : MonoBehaviour
     [Header("云数据库配置")]
     public string envId = "env-nJ2KymQ8pn"; // 环境ID
     public string collectionName = "game_progress"; // 集合名称
+    public string serviceId = "1lyi27pj68f27";//服务id
 
     // 数据库初始化状态
     private bool isInitialized = false;
-    private CloudDBCollection dbCollection; // 数据库集合对象
-    private bool isPlatformSupported = false; // 平台是否支持抖音云
+    private CloudDBCollection dbCollection;
+    private bool isPlatformSupported = false;
+    private DouyinCloud _cloud;
+    private DouyinCloud Cloud => _cloud ??= TT.CreateCloud();
 
     // 添加重试机制
     private const int MAX_RETRY_ATTEMPTS = 3;
@@ -82,7 +87,7 @@ public class DouyinCloudManager : MonoBehaviour
             Debug.Log($"[DouyinCloudManager] 初始化抖音云服务，环境ID：{envId}...");
 
             // 获取数据库集合对象
-            dbCollection = TT.CreateCloud().CloudDb().GenDBCollection(envId, collectionName);
+            dbCollection = Cloud.CloudDb().GenDBCollection(envId, collectionName);
 
             if (dbCollection != null)
             {
@@ -125,7 +130,7 @@ public class DouyinCloudManager : MonoBehaviour
             var tcs = new TaskCompletionSource<bool>();
 
             // 尝试查询集合中的记录来验证集合存在性
-            TT.CreateCloud().CloudDb().GenDBCollection(envId, collectionName).Get(
+            Cloud.CloudDb().GenDBCollection(envId, collectionName).Get(
                 response =>
                 {
                     Debug.Log($"[DouyinCloudManager] 集合验证成功：{response.StatusCode}");
@@ -327,7 +332,7 @@ public class DouyinCloudManager : MonoBehaviour
 
             Debug.Log($"[DouyinCloudManager] 查询文档：{collection}/{docId}");
 
-            TT.CreateCloud().CloudDb().GenDBCollection(envId, collection).Doc(docId).Get(
+            Cloud.CloudDb().GenDBCollection(envId, collection).Doc(docId).Get(
                 response =>
                 {
                     Debug.Log($"[DouyinCloudManager] 查询文档成功：{response.StatusCode}");
@@ -364,29 +369,50 @@ public class DouyinCloudManager : MonoBehaviour
             var tcs = new TaskCompletionSource<string>();
 
             Debug.Log($"[DouyinCloudManager] 条件查询：{collection}");
-            Debug.Log($"[DouyinCloudManager] 查询条件：{string.Join(", ", whereCondition.Select(kv => $"{kv.Key}={kv.Value}"))}");
+            Debug.Log($"[DouyinCloudManager] 查询条件：{(whereCondition != null ? string.Join(", ", whereCondition.Select(kv => $"{kv.Key}={kv.Value}")) : "_openid(自动)")}");
 
-            // 使用Where方法，传入原始的Dictionary
-            var query = TT.CreateCloud().CloudDb().GenDBCollection(envId, collection).Where(whereCondition);
-
-            // 设置limit（如果支持）
-            if (limit > 0)
+            object collectionObj = Cloud.CloudDb().GenDBCollection(envId, collection);
+            if (collectionObj == null)
             {
-                // query = query.Limit(limit); // 如果有Limit方法
+                Debug.LogError("[DouyinCloudManager] 未能获取集合对象");
+                return null;
             }
 
-            query.Get(
-                response =>
-                {
-                    Debug.Log($"[DouyinCloudManager] 条件查询成功：{response.StatusCode}");
-                    tcs.SetResult(response.Data.ToJson());
-                },
-                error =>
-                {
-                    Debug.LogError($"[DouyinCloudManager] 条件查询失败：{error.StatusCode}, {error.ErrMsg}");
-                    tcs.SetResult(null);
-                });
+            var queryType = collectionObj.GetType();
+            var getInfo = SelectGetMethod(queryType, whereCondition != null);
+            if (getInfo.Method == null)
+                throw new InvalidOperationException("无法找到集合的 Get 方法");
 
+            var onSuccessDelegate = CreateDelegate(getInfo.SuccessParameterType, response =>
+            {
+                var props = response.GetType().GetProperties().Select(p => $"{p.Name}={p.GetValue(response)}");
+                var fields = response.GetType().GetFields().Select(f => $"{f.Name}={f.GetValue(response)}");
+                Debug.Log($"[DouyinCloudManager] 条件查询响应属性: {string.Join(", ", props.Concat(fields))}");
+                var data = GetPropertyValue(response, "Data") ?? GetPropertyValue(response, "data")
+                    ?? response.GetType().GetField("Data", BindingFlags.Instance | BindingFlags.Public)?.GetValue(response)
+                    ?? response.GetType().GetField("data", BindingFlags.Instance | BindingFlags.Public)?.GetValue(response);
+                Debug.Log($"[DouyinCloudManager] data 类型: {data?.GetType().FullName}, ToString: {data?.ToString()?.Substring(0, Mathf.Min(200, data?.ToString()?.Length ?? 0))}");
+                tcs.SetResult(data?.ToString());
+            });
+
+            var onErrorDelegate = CreateDelegate(getInfo.ErrorParameterType, error =>
+            {
+                Debug.LogError($"[DouyinCloudManager] 条件查询失败：{GetPropertyValue(error, "StatusCode")}, {GetPropertyValue(error, "ErrMsg")}");
+                tcs.SetResult(null);
+            });
+
+            object[] args;
+            if (getInfo.RequiresQuery)
+            {
+                var queryArg = ConvertWhereCondition(getInfo.QueryParameterType, whereCondition);
+                args = new object[] { queryArg, onSuccessDelegate, onErrorDelegate };
+            }
+            else
+            {
+                args = new object[] { onSuccessDelegate, onErrorDelegate };
+            }
+
+            getInfo.Method.Invoke(collectionObj, args);
             return await tcs.Task;
         }
         catch (Exception e)
@@ -395,6 +421,118 @@ public class DouyinCloudManager : MonoBehaviour
             Debug.LogError($"[DouyinCloudManager] 异常堆栈：{e.StackTrace}");
             return null;
         }
+    }
+
+    private (MethodInfo Method, bool RequiresQuery, Type QueryParameterType, Type SuccessParameterType, Type ErrorParameterType) SelectGetMethod(Type queryType, bool needQuery)
+    {
+        var getMethods = queryType.GetMethods(BindingFlags.Instance | BindingFlags.Public)
+            .Where(m => string.Equals(m.Name, "Get", StringComparison.OrdinalIgnoreCase))
+            .ToArray();
+
+        MethodInfo fallback = null;
+        foreach (var method in getMethods)
+        {
+            var parameters = method.GetParameters();
+            if (parameters.Length == 3 && IsCallbackParameter(parameters[1]) && IsCallbackParameter(parameters[2]))
+            {
+                if (!needQuery)
+                {
+                    return (method, false, null, parameters[1].ParameterType, parameters[2].ParameterType);
+                }
+
+                if (parameters[0].ParameterType == typeof(JsonData)
+                    || parameters[0].ParameterType == typeof(string)
+                    || parameters[0].ParameterType == typeof(object))
+                {
+                    return (method, true, parameters[0].ParameterType, parameters[1].ParameterType, parameters[2].ParameterType);
+                }
+            }
+            else if (parameters.Length == 2 && IsCallbackParameter(parameters[0]) && IsCallbackParameter(parameters[1]))
+            {
+                fallback = method;
+            }
+        }
+
+        if (fallback != null)
+        {
+            var parameters = fallback.GetParameters();
+            return (fallback, false, null, parameters[0].ParameterType, parameters[1].ParameterType);
+        }
+
+        return (null, false, null, null, null);
+    }
+
+    private bool IsCallbackParameter(ParameterInfo parameter)
+    {
+        return typeof(Delegate).IsAssignableFrom(parameter.ParameterType);
+    }
+
+    private object ConvertWhereCondition(Type paramType, object condition)
+    {
+        if (condition == null)
+            return null;
+
+        if (paramType == typeof(JsonData))
+        {
+            if (condition is JsonData jd)
+                return jd;
+            if (condition is Dictionary<string, object> dict)
+                return ToJsonData(dict);
+            return new JsonData(condition.ToString());
+        }
+
+        if (paramType == typeof(string) && condition is JsonData jsonData)
+        {
+            return jsonData.ToJson();
+        }
+
+        if (paramType == typeof(string) && condition is Dictionary<string, object> dictAsString)
+        {
+            return ToJsonData(dictAsString).ToJson();
+        }
+
+        if (paramType == typeof(object) && condition is Dictionary<string, object> dictAsObject)
+        {
+            return ToJsonData(dictAsObject);
+        }
+
+        if (paramType.IsAssignableFrom(condition.GetType()))
+        {
+            return condition;
+        }
+
+        try
+        {
+            return Convert.ChangeType(condition, paramType);
+        }
+        catch
+        {
+            return condition;
+        }
+    }
+
+    private Delegate CreateDelegate(Type delegateType, Action<object> callback)
+    {
+        var invokeMethod = delegateType.GetMethod("Invoke");
+        var parameters = invokeMethod.GetParameters();
+        if (parameters.Length != 1)
+            throw new InvalidOperationException("仅支持单参数回调代理");
+
+        var paramType = parameters[0].ParameterType;
+        var param = Expression.Parameter(paramType, "arg");
+        var callbackConst = Expression.Constant(callback);
+        var convert = Expression.Convert(param, typeof(object));
+        var call = Expression.Call(callbackConst, callback.GetType().GetMethod("Invoke"), convert);
+        var lambda = Expression.Lambda(delegateType, call, param);
+        return lambda.Compile();
+    }
+
+    private object GetPropertyValue(object obj, string property)
+    {
+        if (obj == null)
+            return null;
+        var prop = obj.GetType().GetProperty(property, BindingFlags.Instance | BindingFlags.Public);
+        return prop?.GetValue(obj);
     }
 
     /// <summary>
@@ -416,7 +554,7 @@ public class DouyinCloudManager : MonoBehaviour
 
             // 使用 Where 进行简单查询，不支持复杂的聚合管道
             // 如果需要排序，可以在查询后处理
-            TT.CreateCloud().CloudDb().GenDBCollection(envId, collection).Get(
+            Cloud.CloudDb().GenDBCollection(envId, collection).Get(
                 response =>
                 {
                     Debug.Log($"[DouyinCloudManager] 聚合查询成功：{response.StatusCode}");
@@ -459,7 +597,7 @@ public class DouyinCloudManager : MonoBehaviour
                 // 转换为 JsonData
                 var jsonData = ToJsonData(data);
 
-                TT.CreateCloud().CloudDb().GenDBCollection(envId, collection).Add(
+                Cloud.CloudDb().GenDBCollection(envId, collection).Add(
                     jsonData,
                     response =>
                     {
@@ -523,7 +661,7 @@ public class DouyinCloudManager : MonoBehaviour
             // 转换为 JsonData (使用TTSDK的JsonData)
             var jsonData = ToJsonData(data);
 
-            TT.CreateCloud().CloudDb().GenDBCollection(envId, collection).Doc(docId).Update(
+            Cloud.CloudDb().GenDBCollection(envId, collection).Doc(docId).Update(
                 jsonData,
                 response =>
                 {
@@ -562,7 +700,7 @@ public class DouyinCloudManager : MonoBehaviour
 
             Debug.Log($"[DouyinCloudManager] 删除文档：{collection}/{docId}");
 
-            TT.CreateCloud().CloudDb().GenDBCollection(envId, collection).Doc(docId).Remove(
+            Cloud.CloudDb().GenDBCollection(envId, collection).Doc(docId).Remove(
                 response =>
                 {
                     Debug.Log($"[DouyinCloudManager] 删除文档成功：{response.StatusCode}");
@@ -579,6 +717,50 @@ public class DouyinCloudManager : MonoBehaviour
         catch (Exception e)
         {
             Debug.LogError($"[DouyinCloudManager] 删除文档异常：{e.Message}");
+            return null;
+        }
+    }
+
+    /// <summary>
+    /// 通过云函数获取当前用户的 openId
+    /// </summary>
+    public async Task<string> GetOpenIdAsync()
+    {
+        if (!IsCloudSupported())
+            return null;
+
+        try
+        {
+            var tcs = new TaskCompletionSource<string>();
+            var options = new DouyinCloud.Options
+            {
+                Method = "POST",
+                Data = TTSDK.UNBridgeLib.LitJson.JsonMapper.ToObject("{}")
+            };
+            Cloud.CallContainer(
+                envId, serviceId, "/get_open_id", options,
+                (Action<DouyinCloud.Response>)(response =>
+                {
+                    Debug.Log($"[DouyinCloudManager] CallContainer 返回: {response.Data}");
+                    try
+                    {
+                        var json = TTSDK.UNBridgeLib.LitJson.JsonMapper.ToObject(response.Data);
+                        tcs.SetResult(json["data"]?.ToString());
+                    }
+                    catch { tcs.SetResult(null); }
+                }),
+                (Action<DouyinCloud.ErrorResponse>)(error =>
+                {
+                    Debug.LogError($"[DouyinCloudManager] CallContainer 失败: {error.ErrMsg}");
+                    tcs.SetResult(null);
+                })
+            );
+
+            return await tcs.Task;
+        }
+        catch (Exception e)
+        {
+            Debug.LogError($"[DouyinCloudManager] GetOpenIdAsync 异常: {e.Message}\n{e.StackTrace}");
             return null;
         }
     }

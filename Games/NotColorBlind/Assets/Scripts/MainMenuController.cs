@@ -17,14 +17,31 @@ public class MainMenuController : MonoBehaviour
     public Button leaderboardButton;       // 排行榜按钮
     public LeaderboardUI leaderboardUI;   // 排行榜 UI 引用
 
+    private LeaderboardManager leaderboardManager;
+
     private void Start()
     {
-        // disable start until data is loaded
+        // disable start until actual player data is ready
         startButton.interactable = false;
-        GameData.LoadFromServer(OnDataLoaded);
+
+        // ensure sync manager exists and subscribes to user info ready events
+        var syncManager = GameDataSyncManager.Instance;
+
+        // subscribe to LeaderboardManager user info ready event
+        leaderboardManager = LeaderboardManager.Instance;
+        leaderboardManager.OnUserInfoReady += OnUserInfoReady;
+
+        // refresh UI with any previously loaded game data
+        playerNameText.text = GameData.PlayerName;
+        progressText.text = $"第 {GameData.CurrentLevel} 关";
+
+        if (!string.IsNullOrEmpty(GameData.PlayerName) && GameData.PlayerName != "Player")
+        {
+            startButton.interactable = true;
+        }
 
         startButton.onClick.AddListener(OnStartClicked);
-        
+
         // 绑定排行榜按钮事件
         if (leaderboardButton != null)
         {
@@ -32,8 +49,14 @@ public class MainMenuController : MonoBehaviour
         }
     }
 
-    private void OnDataLoaded()
+    private void OnUserInfoReady(PlayerData playerData)
     {
+        if (playerData != null)
+        {
+            GameData.PlayerName = playerData.username;
+            GameData.CurrentLevel = playerData.max_level;
+        }
+
         playerNameText.text = GameData.PlayerName;
         progressText.text = $"第 {GameData.CurrentLevel} 关";
         startButton.interactable = true;
@@ -57,6 +80,14 @@ public class MainMenuController : MonoBehaviour
         else
         {
             Debug.LogWarning("[MainMenuController] leaderboardUI 未赋值！");
+        }
+    }
+
+    private void OnDestroy()
+    {
+        if (leaderboardManager != null)
+        {
+            leaderboardManager.OnUserInfoReady -= OnUserInfoReady;
         }
     }
 }

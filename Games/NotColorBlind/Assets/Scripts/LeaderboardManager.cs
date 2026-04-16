@@ -35,6 +35,8 @@ public class LeaderboardManager : MonoBehaviour
     private string currentOpenId;
     private string currentUsername;
     private string currentAvatarUrl;
+    private string loginAnonymousCode;
+    private string deviceId; // 设备级别的稳定标识
 
     // 云数据库管理器
     private DouyinCloudManager cloudManager;
@@ -65,11 +67,42 @@ public class LeaderboardManager : MonoBehaviour
         _instance = this;
         DontDestroyOnLoad(gameObject);
 
+        // 初始化设备ID
+        InitializeDeviceId();
+
         // 获取云数据库管理器
         cloudManager = DouyinCloudManager.Instance;
 
         // 初始化抖音 SDK 并获取用户信息
         InitDouyinSDK();
+    }
+
+    /// <summary>
+    /// 初始化设备ID（用于跨会话数据持久化）
+    /// </summary>
+    private void InitializeDeviceId()
+    {
+        try
+        {
+            // 从本地存储获取设备ID
+            deviceId = TTSDK.TTStorage.GetStringSync("DeviceId", "");
+            if (string.IsNullOrEmpty(deviceId))
+            {
+                deviceId = System.Guid.NewGuid().ToString();
+                TTSDK.TTStorage.SetStringSync("DeviceId", deviceId);
+                Debug.Log($"[LeaderboardManager] 生成新设备ID：{deviceId}");
+            }
+            else
+            {
+                Debug.Log($"[LeaderboardManager] 加载设备ID：{deviceId}");
+            }
+        }
+        catch (Exception e)
+        {
+            Debug.LogWarning($"[LeaderboardManager] 初始化设备ID失败：{e.Message}");
+            // 失败时使用随机ID
+            deviceId = System.Guid.NewGuid().ToString();
+        }
     }
 
     /// <summary>
@@ -114,7 +147,8 @@ public class LeaderboardManager : MonoBehaviour
             TTSDK.TT.Login(
                 (code, anonymousCode, isLogin) =>
                 {
-                    Debug.Log($"[LeaderboardManager] 登录成功，isLogin: {isLogin}, code: {code}");
+                    loginAnonymousCode = anonymousCode;
+                    Debug.Log($"[LeaderboardManager] 登录成功，isLogin: {isLogin}, code: {code}, anonymousCode: {anonymousCode}");
                     tcs.SetResult(true);
                 },
                 (errorMsg) =>
@@ -146,14 +180,22 @@ public class LeaderboardManager : MonoBehaviour
 
             if (userInfo != null)
             {
-                currentUserId = userInfo.openId;
-                currentOpenId = userInfo.openId; // 保存 cloudId 作为 openId
+                currentUserId = deviceId;
                 currentUsername = userInfo.nickName;
                 currentAvatarUrl = userInfo.avatarUrl;
                 isInitialized = true;
                 isRealUser = true;
+                GameData.PlayerName = currentUsername;
 
-                Debug.Log($"[LeaderboardManager] 获取到用户信息：{currentUsername}, openid: {currentOpenId}");
+                // 通过云函数获取 openId
+                var openId = await cloudManager.GetOpenIdAsync();
+                if (!string.IsNullOrEmpty(openId))
+                {
+                    currentOpenId = openId;
+                    Debug.Log($"[LeaderboardManager] 云函数获取 openId: {currentOpenId}");
+                }
+
+                Debug.Log($"[LeaderboardManager] 用户信息：{currentUsername}, openId={currentOpenId}");
 
                 // 从云数据库加载玩家数据
                 await LoadPlayerDataFromCloud();
@@ -215,8 +257,9 @@ public class LeaderboardManager : MonoBehaviour
             }
             else
             {
-                Debug.Log("[LeaderboardManager] 云端没有用户记录，使用默认数据");
-                // 保持默认值
+                Debug.Log("[LeaderboardManager] 云端没有用户记录，尝试从本地存储加载");
+                // 尝试从本地存储加载作为后备
+                LoadFromLocalStorage();
             }
         }
         catch (Exception e)
@@ -239,6 +282,8 @@ public class LeaderboardManager : MonoBehaviour
         currentAvatarUrl = "";
         isInitialized = true;
         isRealUser = false;
+
+        GameData.PlayerName = currentUsername;
 
         Debug.Log($"[LeaderboardManager] 使用默认用户信息（本地模式）：{currentUsername}");
 
@@ -312,11 +357,11 @@ public class LeaderboardManager : MonoBehaviour
                     }
 
                     Debug.Log($"[LeaderboardManager] GetUserInfo 成功，昵称={userInfo.nickName}");
-                    Debug.Log($"[LeaderboardManager] CloudId: {(string.IsNullOrEmpty(userInfo.cloudId) ? "未获取" : "已获取")}");
+                    Debug.Log($"[LeaderboardManager] CloudId: {(string.IsNullOrEmpty(GetUserInfoCloudId(userInfo)) ? "未获取" : GetUserInfoCloudId(userInfo))}");
 
                     tcs.SetResult(new DouyinUserInfo
                     {
-                        openId = userInfo.cloudId ?? string.Empty,
+                        openId = string.Empty,
                         nickName = userInfo.nickName,
                         avatarUrl = userInfo.avatarUrl
                     });
@@ -334,6 +379,34 @@ public class LeaderboardManager : MonoBehaviour
         }
 
         return tcs.Task;
+    }
+
+    private string GetUserInfoCloudId(TTSDK.TTUserInfo userInfo)
+    {
+        return GetUserInfoFieldOrProperty(userInfo, "cloudId");
+    }
+
+    private string GetUserInfoFieldOrProperty(TTSDK.TTUserInfo userInfo, string name)
+    {
+        try
+        {
+            var type = userInfo.GetType();
+            var property = type.GetProperty(name, System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.NonPublic);
+            if (property != null)
+            {
+                return property.GetValue(userInfo)?.ToString();
+            }
+
+            var field = type.GetField(name, System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.NonPublic);
+            if (field != null)
+            {
+                return field.GetValue(userInfo)?.ToString();
+            }
+        }
+        catch
+        {
+        }
+        return null;
     }
 
     /// <summary>
@@ -379,44 +452,67 @@ public class LeaderboardManager : MonoBehaviour
     {
         try
         {
-            // 使用 openid 查询用户的记录
-            var whereCondition = new Dictionary<string, object>
-            {
-                {"_openid", currentOpenId}
-            };
+            Dictionary<string, object> whereCondition = null;
+            if (!string.IsNullOrEmpty(currentOpenId))
+                whereCondition = new Dictionary<string, object> { { "_openid", currentOpenId } };
 
+            Debug.Log($"[LeaderboardManager] 查询用户记录，_openid={currentOpenId ?? "未知，返回全部"}");
             var result = await cloudManager.QueryWhereAsync(collectionName, whereCondition, 1);
-            
-            if (!string.IsNullOrEmpty(result))
+            var record = ParseQueryResult(result);
+
+            // 首次查询时从记录中保存 _openid
+            if (record != null && string.IsNullOrEmpty(currentOpenId) && record.ContainsKey("_openid"))
             {
-                var jsonData = JsonMapper.ToObject(result);
-                if (jsonData != null && jsonData["data"] != null)
-                {
-                    var dataArray = jsonData["data"] as JsonData;
-                    if (dataArray != null && dataArray.Count > 0)
-                    {
-                        // 返回第一条记录
-                        var record = dataArray[0];
-                        var recordDict = new Dictionary<string, object>();
-                        
-                        // 转换 JsonData 到 Dictionary
-                        foreach (var key in record.Keys)
-                        {
-                            recordDict[key] = record[key];
-                        }
-                        
-                        return recordDict;
-                    }
-                }
+                currentOpenId = record["_openid"]?.ToString();
+                TTSDK.TTStorage.SetStringSync("CachedOpenId", currentOpenId);
+                Debug.Log($"[LeaderboardManager] 获取并缓存 _openid: {currentOpenId}");
             }
-            
-            return null; // 没有找到记录
+
+            return record;
         }
         catch (Exception e)
         {
             Debug.LogError($"[LeaderboardManager] 查询用户记录失败：{e.Message}");
             return null;
         }
+    }
+
+    private Dictionary<string, object> ParseQueryResult(string result)
+    {
+        if (string.IsNullOrEmpty(result))
+        {
+            Debug.LogWarning("[LeaderboardManager] ParseQueryResult: result 为空");
+            return null;
+        }
+
+        var jsonData = JsonMapper.ToObject(result);
+        if (jsonData == null)
+            return null;
+
+        // 结构: {request_id, list:[...], offset, limit}
+        var list = jsonData["list"] as JsonData;
+        if (list == null || list.Count == 0)
+        {
+            Debug.Log("[LeaderboardManager] ParseQueryResult: list 为空，无记录");
+            return null;
+        }
+
+        Debug.Log($"[LeaderboardManager] ParseQueryResult: 找到 {list.Count} 条记录");
+
+        var firstItem = list[0];
+        var recordDict = new Dictionary<string, object>();
+        foreach (var key in firstItem.Keys)
+        {
+            var val = firstItem[key];
+            recordDict[key] = val?.IsString == true ? (object)val.ToString()
+                : val?.IsInt == true ? (object)(int)val
+                : val?.IsLong == true ? (object)(long)val
+                : val?.IsDouble == true ? (object)(double)val
+                : val?.IsBoolean == true ? (object)(bool)val
+                : val?.ToString();
+        }
+
+        return recordDict;
     }
 
     /// <summary>
@@ -469,6 +565,7 @@ public class LeaderboardManager : MonoBehaviour
                 // 更新现有记录
                 var updateData = new Dictionary<string, object>
                 {
+                    {"user_id", currentUserId},
                     {"username", currentUsername},
                     {"avatar_url", currentAvatarUrl},
                     {"max_level", level},
@@ -491,6 +588,7 @@ public class LeaderboardManager : MonoBehaviour
                 // 创建新记录
                 var newData = new Dictionary<string, object>
                 {
+                    {"user_id", currentUserId},
                     {"username", currentUsername},
                     {"avatar_url", currentAvatarUrl},
                     {"max_level", level},
@@ -562,25 +660,24 @@ public class LeaderboardManager : MonoBehaviour
             if (!string.IsNullOrEmpty(jsonResult))
             {
                 var result = JsonMapper.ToObject(jsonResult);
-                if (result != null && result["data"] != null)
+                // 结构: {request_id, list:[...], offset, limit}
+                var dataList = result?["list"] as JsonData;
+                if (dataList != null)
                 {
-                    var dataList = result["data"] as JsonData;
-                    if (dataList != null)
+                    for (int i = 0; i < dataList.Count; i++)
                     {
-                        for (int i = 0; i < dataList.Count; i++)
+                        var recordJson = dataList[i].ToString();
+                        var playerData = JsonMapper.ToObject<PlayerData>(recordJson);
+                        if (playerData != null)
                         {
-                            var playerData = JsonMapper.ToObject<PlayerData>(dataList[i].ToJson());
-                            if (playerData != null)
+                            records.Add(new LeaderboardRecord
                             {
-                                records.Add(new LeaderboardRecord
-                                {
-                                    user_id = playerData.user_id,
-                                    username = playerData.username,
-                                    avatar_url = playerData.avatar_url,
-                                    max_level = playerData.max_level,
-                                    update_time = playerData.update_time ?? DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss")
-                                });
-                            }
+                                user_id = playerData.user_id,
+                                username = playerData.username,
+                                avatar_url = playerData.avatar_url,
+                                max_level = playerData.max_level,
+                                update_time = playerData.update_time ?? DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss")
+                            });
                         }
                     }
                 }
