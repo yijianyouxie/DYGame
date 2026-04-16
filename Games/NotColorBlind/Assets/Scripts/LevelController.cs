@@ -51,7 +51,7 @@ public class LevelController : MonoBehaviour
 
     private void Start()
     {
-        SetupLevel(GameData.CurrentLevel);
+        SetupLevel(GameData.CurrentLevel + 1);
         
         // 检查特效预制件是否赋值
         if (successEffectPrefab == null)
@@ -289,7 +289,14 @@ public class LevelController : MonoBehaviour
             // 答对，增加连续答对次数
             GameData.ConsecutiveCorrect++;
             
-            // 保存玩家进度到云数据库
+            // 先增加 CurrentLevel，再保存（保存的是下一关的进度）
+            GameData.CurrentLevel++;
+            if (GameData.CurrentLevel > GameData.MaxLevels)
+            {
+                GameData.CurrentLevel = 1; // 循环到第一关
+            }
+            
+            // 保存玩家进度到云数据库（保存的是下一关的进度）
             LeaderboardManager.Instance.SavePlayerProgress(GameData.CurrentLevel);
             
             ShowSuccessEffect();
@@ -306,13 +313,8 @@ public class LevelController : MonoBehaviour
     {
         if (success)
         {
-            // 成功时直接进入下一关
-            GameData.CurrentLevel++;
-            if (GameData.CurrentLevel > GameData.MaxLevels)
-            {
-                GameData.CurrentLevel = 1; // 循环到第一关
-            }
-            SetupLevel(GameData.CurrentLevel);
+            // CurrentLevel++ 已在 OnBlockClicked 中执行，这里直接设置关卡
+            SetupLevel(GameData.CurrentLevel + 1);
         }
         else
         {

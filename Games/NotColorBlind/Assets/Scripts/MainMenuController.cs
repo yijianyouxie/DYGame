@@ -33,7 +33,7 @@ public class MainMenuController : MonoBehaviour
 
         // refresh UI with any previously loaded game data
         playerNameText.text = GameData.PlayerName;
-        progressText.text = $"第 {GameData.CurrentLevel} 关";
+        progressText.text = $"第 {GameData.CurrentLevel + 1} 关";
 
         if (!string.IsNullOrEmpty(GameData.PlayerName) && GameData.PlayerName != "Player")
         {
@@ -58,7 +58,7 @@ public class MainMenuController : MonoBehaviour
         }
 
         playerNameText.text = GameData.PlayerName;
-        progressText.text = $"第 {GameData.CurrentLevel} 关";
+        progressText.text = $"第 {GameData.CurrentLevel + 1} 关";
         startButton.interactable = true;
     }
 
